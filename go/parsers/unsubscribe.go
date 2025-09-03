@@ -8,10 +8,10 @@ import (
 )
 
 type Unsubscribe struct {
-	gen *gen.UnSubscribe
+	gen *gen.Unsubscribe
 }
 
-func NewUnsubscribeFields(gen *gen.UnSubscribe) messages.UnsubscribeFields {
+func NewUnsubscribeFields(gen *gen.Unsubscribe) messages.UnsubscribeFields {
 	return &Unsubscribe{gen: gen}
 }
 
@@ -24,7 +24,7 @@ func (u *Unsubscribe) SubscriptionID() uint64 {
 }
 
 func UnsubscribeToProtobuf(unsubscribe *messages.Unsubscribe) ([]byte, error) {
-	msg := &gen.UnSubscribe{
+	msg := &gen.Unsubscribe{
 		RequestId:      unsubscribe.RequestID(),
 		SubscriptionId: unsubscribe.SubscriptionID(),
 	}
@@ -34,12 +34,11 @@ func UnsubscribeToProtobuf(unsubscribe *messages.Unsubscribe) ([]byte, error) {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeUnsubscribe & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeUnsubscribe, data, nil), nil
 }
 
 func ProtobufToUnsubscribe(data []byte) (*messages.Unsubscribe, error) {
-	msg := &gen.UnSubscribe{}
+	msg := &gen.Unsubscribe{}
 	err := proto.Unmarshal(data, msg)
 	if err != nil {
 		return nil, err

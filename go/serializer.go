@@ -92,55 +92,60 @@ func (p *ProtobufSerializer) Serialize(message messages.Message) ([]byte, error)
 }
 
 func (p *ProtobufSerializer) Deserialize(bytes []byte) (messages.Message, error) {
+	messageData, payloadData, err := parsers.ExtractMessage(bytes)
+	if err != nil {
+		return nil, err
+	}
+
 	switch uint64(bytes[0]) {
 	case messages.MessageTypeHello:
-		return parsers.ProtobufToHello(bytes[1:])
+		return parsers.ProtobufToHello(messageData)
 	case messages.MessageTypeWelcome:
-		return parsers.ProtobufToWelcome(bytes[1:])
+		return parsers.ProtobufToWelcome(messageData)
 	case messages.MessageTypeChallenge:
-		return parsers.ProtobufToChallenge(bytes[1:])
+		return parsers.ProtobufToChallenge(messageData)
 	case messages.MessageTypeAuthenticate:
-		return parsers.ProtobufToAuthenticate(bytes[1:])
+		return parsers.ProtobufToAuthenticate(messageData)
 	case messages.MessageTypeGoodbye:
-		return parsers.ProtobufToGoodbye(bytes[1:])
+		return parsers.ProtobufToGoodbye(messageData)
 	case messages.MessageTypeCall:
-		return parsers.ProtobufToCall(bytes[1:])
+		return parsers.ProtobufToCall(messageData, payloadData)
 	case messages.MessageTypeInvocation:
-		return parsers.ProtobufToInvocation(bytes[1:])
+		return parsers.ProtobufToInvocation(messageData, payloadData)
 	case messages.MessageTypeYield:
-		return parsers.ProtobufToYield(bytes[1:])
+		return parsers.ProtobufToYield(messageData, payloadData)
 	case messages.MessageTypeResult:
-		return parsers.ProtobufToResult(bytes[1:])
+		return parsers.ProtobufToResult(messageData, payloadData)
 	case messages.MessageTypeRegister:
-		return parsers.ProtobufToRegister(bytes[1:])
+		return parsers.ProtobufToRegister(messageData)
 	case messages.MessageTypeRegistered:
-		return parsers.ProtobufToRegistered(bytes[1:])
+		return parsers.ProtobufToRegistered(messageData)
 	case messages.MessageTypeUnregister:
-		return parsers.ProtobufToUnregister(bytes[1:])
+		return parsers.ProtobufToUnregister(messageData)
 	case messages.MessageTypeUnregistered:
-		return parsers.ProtobufToUnregistered(bytes[1:])
+		return parsers.ProtobufToUnregistered(messageData)
 	case messages.MessageTypeAbort:
-		return parsers.ProtobufToAbort(bytes[1:])
+		return parsers.ProtobufToAbort(messageData, payloadData)
 	case messages.MessageTypeCancel:
-		return parsers.ProtobufToCancel(bytes[1:])
+		return parsers.ProtobufToCancel(messageData)
 	case messages.MessageTypeInterrupt:
-		return parsers.ProtobufToInterrupt(bytes[1:])
+		return parsers.ProtobufToInterrupt(messageData)
 	case messages.MessageTypePublish:
-		return parsers.ProtobufToPublish(bytes[1:])
+		return parsers.ProtobufToPublish(messageData, payloadData)
 	case messages.MessageTypePublished:
-		return parsers.ProtobufToPublished(bytes[1:])
+		return parsers.ProtobufToPublished(messageData)
 	case messages.MessageTypeEvent:
-		return parsers.ProtobufToEvent(bytes[1:])
+		return parsers.ProtobufToEvent(messageData, payloadData)
 	case messages.MessageTypeSubscribe:
-		return parsers.ProtobufToSubscribe(bytes[1:])
+		return parsers.ProtobufToSubscribe(messageData)
 	case messages.MessageTypeSubscribed:
-		return parsers.ProtobufToSubscribed(bytes[1:])
+		return parsers.ProtobufToSubscribed(messageData)
 	case messages.MessageTypeUnsubscribe:
-		return parsers.ProtobufToUnsubscribe(bytes[1:])
+		return parsers.ProtobufToUnsubscribe(messageData)
 	case messages.MessageTypeUnsubscribed:
-		return parsers.ProtobufToUnsubscribed(bytes[1:])
+		return parsers.ProtobufToUnsubscribed(messageData)
 	case messages.MessageTypeError:
-		return parsers.ProtobufToError(bytes[1:])
+		return parsers.ProtobufToError(messageData, payloadData)
 	default:
 		return nil, fmt.Errorf("unknown message type: %v", bytes[0])
 	}

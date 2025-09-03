@@ -34,8 +34,7 @@ func SubscribedToProtobuf(subscribed *messages.Subscribed) ([]byte, error) {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeSubscribed & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeSubscribed, data, nil), nil
 }
 
 func ProtobufToSubscribed(data []byte) (*messages.Subscribed, error) {

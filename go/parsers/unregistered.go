@@ -8,10 +8,10 @@ import (
 )
 
 type Unregistered struct {
-	gen *gen.UnRegistered
+	gen *gen.Unregistered
 }
 
-func NewUnregisteredFields(gen *gen.UnRegistered) messages.UnregisteredFields {
+func NewUnregisteredFields(gen *gen.Unregistered) messages.UnregisteredFields {
 	return &Unregistered{gen: gen}
 }
 
@@ -20,7 +20,7 @@ func (u *Unregistered) RequestID() uint64 {
 }
 
 func UnregisteredToProtobuf(unregistered *messages.Unregistered) ([]byte, error) {
-	msg := &gen.UnRegistered{
+	msg := &gen.Unregistered{
 		RequestId: unregistered.RequestID(),
 	}
 
@@ -29,12 +29,11 @@ func UnregisteredToProtobuf(unregistered *messages.Unregistered) ([]byte, error)
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeUnregistered & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeUnregistered, data, nil), nil
 }
 
 func ProtobufToUnregistered(data []byte) (*messages.Unregistered, error) {
-	msg := &gen.UnRegistered{}
+	msg := &gen.Unregistered{}
 	err := proto.Unmarshal(data, msg)
 	if err != nil {
 		return nil, err

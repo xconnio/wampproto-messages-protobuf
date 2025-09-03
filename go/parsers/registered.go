@@ -34,8 +34,7 @@ func RegisteredToProtobuf(registered *messages.Registered) ([]byte, error) {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeRegistered & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeRegistered, data, nil), nil
 }
 
 func ProtobufToRegistered(data []byte) (*messages.Registered, error) {

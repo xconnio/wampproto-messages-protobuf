@@ -11,10 +11,11 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	golang.org/x/crypto v0.23.0 // indirect
+	golang.org/x/exp v0.0.0-20240525044651-4c93da0ed11d // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

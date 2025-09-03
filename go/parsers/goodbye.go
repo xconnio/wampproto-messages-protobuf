@@ -33,8 +33,7 @@ func GoodbyeToProtobuf(goodbye *messages.GoodBye) ([]byte, error) {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeGoodbye & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeGoodbye, data, nil), nil
 }
 
 func ProtobufToGoodbye(data []byte) (*messages.GoodBye, error) {

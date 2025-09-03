@@ -1,9 +1,6 @@
 package parsers
 
 import (
-	"log"
-	"sync"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/xconnio/wampproto-go/messages"
@@ -13,14 +10,14 @@ import (
 
 type Publish struct {
 	gen *gen.Publish
-
-	args   []any
-	kwArgs map[string]any
-	once   sync.Once
+	ex  *PayloadExpander
 }
 
-func NewPublishFields(gen *gen.Publish) messages.PublishFields {
-	return &Publish{gen: gen}
+func NewPublishFields(gen *gen.Publish, payload []byte) messages.PublishFields {
+	return &Publish{
+		gen: gen,
+		ex:  &PayloadExpander{payload: payload, serializer: gen.GetPayloadSerializerId()},
+	}
 }
 
 func (p *Publish) RequestID() uint64 {
@@ -28,31 +25,29 @@ func (p *Publish) RequestID() uint64 {
 }
 
 func (p *Publish) Options() map[string]any {
-	return map[string]any{}
+	var details map[string]any
+
+	if !p.gen.ExcludeMe {
+		setDetail(&details, "exclude_me", false)
+	}
+
+	if p.gen.Acknowledge {
+		setDetail(&details, "acknowledge", true)
+	}
+
+	return details
 }
 
 func (p *Publish) Topic() string {
 	return p.gen.GetTopic()
 }
 
-func (p *Publish) unpack() {
-	args, kwargs, err := serializers.DecodeCBOR(p.Payload())
-	if err != nil {
-		log.Println("error parsing CBOR payload:", err)
-	} else {
-		p.args = args
-		p.kwArgs = kwargs
-	}
-}
-
 func (p *Publish) Args() []any {
-	p.once.Do(p.unpack)
-	return p.args
+	return p.ex.Args()
 }
 
 func (p *Publish) KwArgs() map[string]any {
-	p.once.Do(p.unpack)
-	return p.kwArgs
+	return p.ex.Kwargs()
 }
 
 func (p *Publish) PayloadIsBinary() bool {
@@ -60,33 +55,39 @@ func (p *Publish) PayloadIsBinary() bool {
 }
 
 func (p *Publish) Payload() []byte {
-	return p.gen.GetPayload()
+	return p.ex.Payload()
 }
 
 func (p *Publish) PayloadSerializer() uint64 {
-	return p.gen.GetPayloadSerializer()
+	return p.gen.GetPayloadSerializerId()
 }
 
 func PublishToProtobuf(publish *messages.Publish) ([]byte, error) {
-	var msg *gen.Publish
+	msg := &gen.Publish{
+		RequestId: publish.RequestID(),
+		Topic:     publish.Topic(),
+	}
+	acknowledge, ok := publish.Options()["acknowledge"].(bool)
+	if ok {
+		msg.Acknowledge = acknowledge
+	}
+
+	excludeMe, ok := publish.Options()["exclude_me"].(bool)
+	if ok {
+		msg.ExcludeMe = excludeMe
+	}
+
+	payloadSerializer := selectPayloadSerializer(publish.Options())
+	msg.PayloadSerializerId = payloadSerializer
+
+	var payload []byte
 	if publish.PayloadIsBinary() {
-		msg = &gen.Publish{
-			RequestId:         publish.RequestID(),
-			Topic:             publish.Topic(),
-			PayloadSerializer: publish.PayloadSerializer(),
-			Payload:           publish.Payload(),
-		}
+		payload = publish.Payload()
 	} else {
-		payload, err := serializers.EncodeCBOR(publish.Args(), publish.KwArgs())
+		var err error
+		payload, err = serializers.SerializePayload(payloadSerializer, publish.Args(), publish.KwArgs())
 		if err != nil {
 			return nil, err
-		}
-
-		msg = &gen.Publish{
-			RequestId:         publish.RequestID(),
-			Topic:             publish.Topic(),
-			PayloadSerializer: serializers.CBORSerializerID,
-			Payload:           payload,
 		}
 	}
 
@@ -95,16 +96,15 @@ func PublishToProtobuf(publish *messages.Publish) ([]byte, error) {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypePublish & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypePublish, data, payload), nil
 }
 
-func ProtobufToPublish(data []byte) (*messages.Publish, error) {
+func ProtobufToPublish(data, payload []byte) (*messages.Publish, error) {
 	msg := &gen.Publish{}
 	err := proto.Unmarshal(data, msg)
 	if err != nil {
 		return nil, err
 	}
 
-	return messages.NewPublishWithFields(NewPublishFields(msg)), nil
+	return messages.NewPublishWithFields(NewPublishFields(msg, payload)), nil
 }

@@ -34,8 +34,7 @@ func PublishedToProtobuf(published *messages.Published) ([]byte, error) {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypePublished & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypePublished, data, nil), nil
 }
 
 func ProtobufToPublished(data []byte) (*messages.Published, error) {

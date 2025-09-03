@@ -33,8 +33,7 @@ func AuthenticateToProtobuf(authenticate *messages.Authenticate) ([]byte, error)
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeAuthenticate & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeAuthenticate, data, nil), nil
 }
 
 func ProtobufToAuthenticate(data []byte) (*messages.Authenticate, error) {

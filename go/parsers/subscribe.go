@@ -20,7 +20,11 @@ func (s *Subscribe) RequestID() uint64 {
 }
 
 func (s *Subscribe) Options() map[string]any {
-	return map[string]any{}
+	options := make(map[string]any)
+	if s.gen.Match.String() != "" {
+		setDetail(&options, "match", s.gen.Match.String())
+	}
+	return options
 }
 
 func (s *Subscribe) Topic() string {
@@ -33,13 +37,20 @@ func SubscribeToProtobuf(subscribe *messages.Subscribe) ([]byte, error) {
 		Topic:     subscribe.Topic(),
 	}
 
+	matchString, ok := subscribe.Options()["match"].(string)
+	if ok {
+		matchValue, ok := gen.Subscribe_Match_value[matchString]
+		if ok {
+			msg.Match = gen.Subscribe_Match(matchValue)
+		}
+	}
+
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeSubscribe & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeSubscribe, data, nil), nil
 }
 
 func ProtobufToSubscribe(data []byte) (*messages.Subscribe, error) {

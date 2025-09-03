@@ -33,8 +33,7 @@ func InterruptToProtobuf(interrupt *messages.Interrupt) ([]byte, error) {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeInterrupt & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeInterrupt, data, nil), nil
 }
 
 func ProtobufToInterrupt(data []byte) (*messages.Interrupt, error) {

@@ -33,8 +33,7 @@ func CancelToProtobuf(cancel *messages.Cancel) ([]byte, error) {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeCancel & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeCancel, data, nil), nil
 }
 
 func ProtobufToCancel(data []byte) (*messages.Cancel, error) {

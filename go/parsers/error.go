@@ -1,9 +1,6 @@
 package parsers
 
 import (
-	"log"
-	"sync"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/xconnio/wampproto-go/messages"
@@ -13,14 +10,14 @@ import (
 
 type Error struct {
 	gen *gen.Error
-
-	args   []any
-	kwArgs map[string]any
-	once   sync.Once
+	ex  *PayloadExpander
 }
 
-func NewErrorFields(gen *gen.Error) messages.ErrorFields {
-	return &Error{gen: gen}
+func NewErrorFields(gen *gen.Error, payload []byte) messages.ErrorFields {
+	return &Error{
+		gen: gen,
+		ex:  &PayloadExpander{payload: payload, serializer: gen.GetPayloadSerializerId()},
+	}
 }
 
 func (e *Error) MessageType() uint64 {
@@ -39,24 +36,12 @@ func (e *Error) URI() string {
 	return e.gen.Uri
 }
 
-func (e *Error) unpack() {
-	args, kwargs, err := serializers.DecodeCBOR(e.Payload())
-	if err != nil {
-		log.Println("error parsing CBOR payload:", err)
-	} else {
-		e.args = args
-		e.kwArgs = kwargs
-	}
-}
-
 func (e *Error) Args() []any {
-	e.once.Do(e.unpack)
-	return e.args
+	return e.ex.Args()
 }
 
 func (e *Error) KwArgs() map[string]any {
-	e.once.Do(e.unpack)
-	return e.kwArgs
+	return e.ex.Kwargs()
 }
 
 func (e *Error) PayloadIsBinary() bool {
@@ -64,35 +49,31 @@ func (e *Error) PayloadIsBinary() bool {
 }
 
 func (e *Error) Payload() []byte {
-	return e.gen.GetPayload()
+	return e.ex.Payload()
 }
 
 func (e *Error) PayloadSerializer() uint64 {
-	return e.gen.GetPayloadSerializer()
+	return e.gen.GetPayloadSerializerId()
 }
 
-func ErrorToProtobuf(error *messages.Error) ([]byte, error) {
-	var msg *gen.Error
-	if error.PayloadIsBinary() {
-		msg = &gen.Error{
-			MessageType:       error.MessageType(),
-			RequestId:         error.RequestID(),
-			Uri:               error.URI(),
-			PayloadSerializer: error.PayloadSerializer(),
-			Payload:           error.Payload(),
-		}
+func ErrorToProtobuf(errMsg *messages.Error) ([]byte, error) {
+	msg := &gen.Error{
+		MessageType: errMsg.MessageType(),
+		RequestId:   errMsg.RequestID(),
+		Uri:         errMsg.URI(),
+	}
+
+	payloadSerializer := selectPayloadSerializer(errMsg.Details())
+	msg.PayloadSerializerId = payloadSerializer
+
+	var payload []byte
+	if errMsg.PayloadIsBinary() {
+		payload = errMsg.Payload()
 	} else {
-		payload, err := serializers.EncodeCBOR(error.Args(), error.KwArgs())
+		var err error
+		payload, err = serializers.SerializePayload(payloadSerializer, errMsg.Args(), errMsg.KwArgs())
 		if err != nil {
 			return nil, err
-		}
-
-		msg = &gen.Error{
-			MessageType:       error.MessageType(),
-			RequestId:         error.RequestID(),
-			Uri:               error.URI(),
-			PayloadSerializer: serializers.CBORSerializerID,
-			Payload:           payload,
 		}
 	}
 
@@ -101,16 +82,15 @@ func ErrorToProtobuf(error *messages.Error) ([]byte, error) {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeError & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeError, data, payload), nil
 }
 
-func ProtobufToError(data []byte) (*messages.Error, error) {
+func ProtobufToError(data, payload []byte) (*messages.Error, error) {
 	msg := &gen.Error{}
 	err := proto.Unmarshal(data, msg)
 	if err != nil {
 		return nil, err
 	}
 
-	return messages.NewErrorWithFields(NewErrorFields(msg)), nil
+	return messages.NewErrorWithFields(NewErrorFields(msg, payload)), nil
 }

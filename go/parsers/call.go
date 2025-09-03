@@ -1,9 +1,6 @@
 package parsers
 
 import (
-	"log"
-	"sync"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/xconnio/wampproto-go/messages"
@@ -13,14 +10,14 @@ import (
 
 type Call struct {
 	gen *gen.Call
-
-	args   []any
-	kwArgs map[string]any
-	once   sync.Once
+	ex  *PayloadExpander
 }
 
-func NewCallFields(callGen *gen.Call) messages.CallFields {
-	return &Call{gen: callGen}
+func NewCallFields(callGen *gen.Call, payload []byte) messages.CallFields {
+	return &Call{
+		gen: callGen,
+		ex:  &PayloadExpander{payload: payload, serializer: callGen.GetPayloadSerializerId()},
+	}
 }
 
 func (c *Call) RequestID() uint64 {
@@ -35,24 +32,12 @@ func (c *Call) Procedure() string {
 	return c.gen.GetProcedure()
 }
 
-func (c *Call) unpack() {
-	args, kwargs, err := serializers.DecodeCBOR(c.Payload())
-	if err != nil {
-		log.Println("error parsing CBOR payload:", err)
-	} else {
-		c.args = args
-		c.kwArgs = kwargs
-	}
-}
-
 func (c *Call) Args() []any {
-	c.once.Do(c.unpack)
-	return c.args
+	return c.ex.Args()
 }
 
 func (c *Call) KwArgs() map[string]any {
-	c.once.Do(c.unpack)
-	return c.kwArgs
+	return c.ex.Kwargs()
 }
 
 func (c *Call) PayloadIsBinary() bool {
@@ -60,33 +45,30 @@ func (c *Call) PayloadIsBinary() bool {
 }
 
 func (c *Call) Payload() []byte {
-	return c.gen.GetPayload()
+	return c.ex.Payload()
 }
 
 func (c *Call) PayloadSerializer() uint64 {
-	return c.gen.GetPayloadSerializer()
+	return c.gen.GetPayloadSerializerId()
 }
 
 func CallToProtobuf(call *messages.Call) ([]byte, error) {
-	var msg *gen.Call
+	msg := &gen.Call{
+		RequestId: call.RequestID(),
+		Procedure: call.Procedure(),
+	}
+
+	payloadSerializer := selectPayloadSerializer(call.Options())
+	msg.PayloadSerializerId = payloadSerializer
+
+	var payload []byte
 	if call.PayloadIsBinary() {
-		msg = &gen.Call{
-			RequestId:         call.RequestID(),
-			Procedure:         call.Procedure(),
-			PayloadSerializer: call.PayloadSerializer(),
-			Payload:           call.Payload(),
-		}
+		payload = call.Payload()
 	} else {
-		payload, err := serializers.EncodeCBOR(call.Args(), call.KwArgs())
+		var err error
+		payload, err = serializers.SerializePayload(payloadSerializer, call.Args(), call.KwArgs())
 		if err != nil {
 			return nil, err
-		}
-
-		msg = &gen.Call{
-			RequestId:         call.RequestID(),
-			Procedure:         call.Procedure(),
-			PayloadSerializer: serializers.CBORSerializerID,
-			Payload:           payload,
 		}
 	}
 
@@ -95,16 +77,15 @@ func CallToProtobuf(call *messages.Call) ([]byte, error) {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeCall & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeCall, data, payload), nil
 }
 
-func ProtobufToCall(data []byte) (*messages.Call, error) {
+func ProtobufToCall(data, payload []byte) (*messages.Call, error) {
 	msg := &gen.Call{}
 	err := proto.Unmarshal(data, msg)
 	if err != nil {
 		return nil, err
 	}
 
-	return messages.NewCallWithFields(NewCallFields(msg)), nil
+	return messages.NewCallWithFields(NewCallFields(msg, payload)), nil
 }

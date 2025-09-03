@@ -20,7 +20,14 @@ func (r *Register) RequestID() uint64 {
 }
 
 func (r *Register) Options() map[string]any {
-	return map[string]any{}
+	options := make(map[string]any)
+	if r.gen.Match.String() != "" {
+		setDetail(&options, "match", r.gen.Match.String())
+	}
+	if r.gen.Invoke.String() != "" {
+		setDetail(&options, "invoke", r.gen.Invoke.String())
+	}
+	return options
 }
 
 func (r *Register) Procedure() string {
@@ -33,13 +40,28 @@ func RegisterToProtobuf(register *messages.Register) ([]byte, error) {
 		Procedure: register.Procedure(),
 	}
 
+	matchString, ok := register.Options()["match"].(string)
+	if ok {
+		matchValue, ok := gen.Register_Match_value[matchString]
+		if ok {
+			msg.Match = gen.Register_Match(matchValue)
+		}
+	}
+
+	invokeString, ok := register.Options()["invoke"].(string)
+	if ok {
+		invokeValue, ok := gen.Register_Invoke_value[invokeString]
+		if ok {
+			msg.Invoke = gen.Register_Invoke(invokeValue)
+		}
+	}
+
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		return nil, err
 	}
 
-	byteValue := byte(messages.MessageTypeRegister & 0xFF)
-	return append([]byte{byteValue}, data...), nil
+	return PrependHeader(messages.MessageTypeRegister, data, nil), nil
 }
 
 func ProtobufToRegister(data []byte) (*messages.Register, error) {
